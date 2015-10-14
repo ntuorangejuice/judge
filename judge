@@ -1,0 +1,218 @@
+#!/usr/bin/python
+
+import sys
+import os
+import traceback
+
+USAGE_MESSAGE = """
+judge - online judge helper
+---------------------------
+
+Commands:
+
+init <solution_name> [-l<language>]
+    Create a solution in specified language (default C++).
+
+edit <solution_name>
+    Open Sublime Text to edit the solution.
+
+run <solution_name>
+    Compile a solution and run against test cases.
+    This is the default command if no command is specified.
+
+
+Options:
+
+--help, -h
+    Print this user manual.
+
+--version, -v
+    Print software version.
+"""
+USAGE_MESSAGE = USAGE_MESSAGE[1:]
+
+LANGUAGES = ['C++', 'JAVA']
+SOLUTION_FILE = {
+    'C++': 'main.cpp',
+    'JAVA': 'Main.Java'
+}
+OUTPUT_FILE = {
+    'C++': 'main.out'
+}
+TEMPLATE_FILE = {
+    'C++': 'templates/default.cpp',
+    'JAVA': 'templates/default.java'
+}
+COMPILE_SCRIPT = {
+    'C++': 'g++ %s -I%s -DJUDGE -std=c++0x -o %s'
+}
+RUN_SCRIPT = {
+    'C++': '%s < %s'
+}
+
+arguments = []
+solution_dir = None
+
+
+class PRINT_COLOR:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+def print_script(s):
+    print PRINT_COLOR.OKBLUE + s + PRINT_COLOR.ENDC
+
+
+def print_success(s):
+    print PRINT_COLOR.OKGREEN + s + PRINT_COLOR.ENDC
+
+
+def print_error(s):
+    print PRINT_COLOR.FAIL + s + PRINT_COLOR.ENDC
+
+
+def check_solution_existence():
+    if not os.path.isdir(solution_dir):
+        return False
+    for sol_file in SOLUTION_FILE.itervalues():
+        if os.path.isfile(os.path.join(solution_dir, sol_file)):
+            return True
+    return False
+
+
+def get_solution_language():
+    for sol_lang, sol_file in SOLUTION_FILE.iteritems():
+        if os.path.isfile(os.path.join(solution_dir, sol_file)):
+            return sol_lang
+
+
+def get_template(language):
+    template_file = os.path.join(os.path.dirname(__file__), TEMPLATE_FILE[language])
+    with open(template_file, 'r') as f:
+        return f.read()
+
+
+def c_init():
+    global solution_dir
+    cwd = os.getcwd()
+    if len(arguments) == 1:
+        solution_dir = cwd
+    else:
+        solution_dir = os.path.join(cwd, arguments[1])
+    language = 'C++'
+
+    if check_solution_existence():
+        print "Solution exists in " + solution_dir
+        exit(1)
+
+    if not os.path.exists(solution_dir):
+        try:
+            os.mkdir(solution_dir)
+        except Exception as e:
+            print "Failed to create solution at " + solution_dir + " with messages: "
+            traceback.print_exc()
+
+    template = get_template(language)
+    with open(os.path.join(solution_dir, SOLUTION_FILE[language]), 'w') as f:
+        f.write(template)
+
+    open(os.path.join(solution_dir, 'sample.input'), 'w')
+
+    os.system('subl ' + os.path.join(solution_dir, SOLUTION_FILE[language]))
+
+    print "Created solution at " + solution_dir
+
+
+def c_edit():
+    global solution_dir
+    cwd = os.getcwd()
+    if len(arguments) == 1:
+        solution_dir = cwd
+    else:
+        solution_dir = os.path.join(cwd, arguments[1])
+    language = 'C++'
+
+    if not check_solution_existence():
+        print "Solution not found in " + solution_dir
+        exit(2)
+
+    os.system('subl ' + os.path.join(solution_dir, SOLUTION_FILE[language]))
+
+
+def c_run():
+    global solution_dir
+    cwd = os.getcwd()
+    if len(arguments) == 1:
+        solution_dir = cwd
+    else:
+        solution_dir = os.path.join(cwd, arguments[1])
+    language = 'C++'
+
+    if not check_solution_existence():
+        print "Solution not found in " + solution_dir
+        exit(2)
+
+    print "Start compiling..."
+
+    compile_script = COMPILE_SCRIPT[language] % (
+        os.path.join(solution_dir, SOLUTION_FILE[language]),
+        os.path.join(os.path.dirname(__file__), 'cpp_header'),
+        os.path.join(solution_dir, OUTPUT_FILE[language])
+    )
+
+    print_script(compile_script)
+
+    os.system(compile_script)
+    if os.path.isfile(os.path.join(solution_dir, OUTPUT_FILE[language])):
+        print_success("Successfully compiled.")
+
+    input_files = []
+    for file_name in os.listdir(solution_dir):
+        if len(file_name) > 6 and file_name[-6:] == '.input':
+            input_files.append(file_name)
+
+    for run_input in input_files:
+        message = "Running with input " + run_input
+        print "-" * len(message)
+        print message
+
+        run_script = RUN_SCRIPT[language] % (
+            os.path.join(solution_dir, OUTPUT_FILE[language]),
+            os.path.join(solution_dir, run_input)
+        )
+        print_script(run_script)
+
+        os.system(run_script)
+
+
+COMMANDS = {
+    "init": c_init,
+    "edit": c_edit,
+    "run": c_run
+}
+
+
+def main():
+    global arguments
+    if len(sys.argv) == 1:
+        command = 'run'
+        arguments = ['run'] + sys.argv[1:]
+    else:
+        command = sys.argv[1]
+        arguments = sys.argv[1:]
+    if command == '-h' or command == '--help':
+        print USAGE_MESSAGE
+        exit(0)
+    if command not in COMMANDS.keys():
+        print "Command \"" + command + "\" not found. Run \"judge -h\" to print the user manual."
+        return
+    COMMANDS[command]()
+
+if __name__ == "__main__":
+    main()
