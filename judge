@@ -10,15 +10,19 @@ judge - online judge helper
 
 Commands:
 
-init <solution_name> [-l<language>]
+init [<solution_name>] [-l <cpp/java>] [-t <template>]
     Create a solution in specified language (default C++).
+    Solution will be set to current directory if not specified, which is the same for the followings.
 
 edit <solution_name>
     Open Sublime Text to edit the solution.
 
-run <solution_name>
+run <solution_name> [-i <input_file>]
     Compile a solution and run against test cases.
     This is the default command if no command is specified.
+
+check <solution_name> [-i <input_file>]
+    Compile a solution and run against test cases, and check the output against correct answer.
 
 
 Options:
@@ -217,8 +221,14 @@ def main():
         print USAGE_MESSAGE
         exit(0)
     if command not in COMMANDS.keys():
-        print "Command \"" + command + "\" not found. Run \"judge -h\" to print the user manual."
-        return
+        global solution_dir
+        solution_dir = os.path.join(os.getcwd(), command)
+        if check_solution_existence():
+            command = 'run'
+            arguments = ['run'] + arguments
+        else:
+            print "Command \"" + command + "\" not found. Run \"judge -h\" to print the user manual."
+            exit(1)
     COMMANDS[command]()
 
 if __name__ == "__main__":
