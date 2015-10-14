@@ -171,7 +171,11 @@ def c_run():
     os.system(compile_script)
     if os.path.isfile(os.path.join(solution_dir, OUTPUT_FILE[language])):
         print_success("Successfully compiled.")
+    else:
+        print_error("Failed to compile.")
+        exit(1)
 
+    # Run
     input_files = []
     for file_name in os.listdir(solution_dir):
         if len(file_name) > 6 and file_name[-6:] == '.input':
@@ -189,6 +193,9 @@ def c_run():
         print_script(run_script)
 
         os.system(run_script)
+
+    # Delete
+    os.remove(os.path.join(solution_dir, OUTPUT_FILE[language]))
 
 
 COMMANDS = {
