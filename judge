@@ -35,30 +35,17 @@ Options:
 """
 USAGE_MESSAGE = USAGE_MESSAGE[1:]
 
-LANGUAGES = ['C++', 'JAVA']
-SOLUTION_FILE = {
-    'C++': 'main.cpp',
-    'JAVA': 'Main.Java'
-}
-OUTPUT_FILE = {
-    'C++': 'main.out'
-}
-TEMPLATE_FILE = {
-    'C++': 'templates/default.cpp',
-    'JAVA': 'templates/default.java'
-}
-COMPILE_SCRIPT = {
-    'C++': 'g++ %s -I%s -DJUDGE -std=c++0x -o %s'
-}
-RUN_SCRIPT = {
-    'C++': '%s < %s'
-}
+SOLUTION_FILE = 'main.cpp'
+OUTPUT_FILE = 'main.out'
+TEMPLATE_FILE = 'templates/default.cpp'
+COMPILE_SCRIPT = 'g++ %s -I%s -DJUDGE -std=c++0x -o %s'
+RUN_SCRIPT = 'time %s < %s'
 
 arguments = []
 solution_dir = None
 
 
-class PRINT_COLOR:
+class PrintColor:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -70,46 +57,47 @@ class PRINT_COLOR:
 
 
 def print_script(s):
-    print PRINT_COLOR.OKBLUE + s + PRINT_COLOR.ENDC
+    print PrintColor.OKBLUE + s + PrintColor.ENDC
 
 
 def print_success(s):
-    print PRINT_COLOR.OKGREEN + s + PRINT_COLOR.ENDC
+    print PrintColor.OKGREEN + s + PrintColor.ENDC
 
 
 def print_error(s):
-    print PRINT_COLOR.FAIL + s + PRINT_COLOR.ENDC
+    print PrintColor.FAIL + s + PrintColor.ENDC
 
 
 def check_solution_existence():
     if not os.path.isdir(solution_dir):
         return False
-    for sol_file in SOLUTION_FILE.itervalues():
-        if os.path.isfile(os.path.join(solution_dir, sol_file)):
-            return True
+    if os.path.isfile(os.path.join(solution_dir, SOLUTION_FILE)):
+        return True
     return False
 
 
-def get_solution_language():
-    for sol_lang, sol_file in SOLUTION_FILE.iteritems():
-        if os.path.isfile(os.path.join(solution_dir, sol_file)):
-            return sol_lang
-
-
-def get_template(language):
-    template_file = os.path.join(os.path.dirname(__file__), TEMPLATE_FILE[language])
+def get_template():
+    template_file = os.path.join(os.path.dirname(__file__), TEMPLATE_FILE)
     with open(template_file, 'r') as f:
         return f.read()
 
 
-def c_init():
+def determine_solution_dir():
     global solution_dir
     cwd = os.getcwd()
     if len(arguments) == 1:
         solution_dir = cwd
     else:
         solution_dir = os.path.join(cwd, arguments[1])
-    language = 'C++'
+
+
+def init():
+    global solution_dir
+    cwd = os.getcwd()
+    if len(arguments) == 1:
+        solution_dir = cwd
+    else:
+        solution_dir = os.path.join(cwd, arguments[1])
 
     if check_solution_existence():
         print "Solution exists in " + solution_dir
@@ -122,41 +110,40 @@ def c_init():
             print "Failed to create solution at " + solution_dir + " with messages: "
             traceback.print_exc()
 
-    template = get_template(language)
-    with open(os.path.join(solution_dir, SOLUTION_FILE[language]), 'w') as f:
+    template = get_template()
+    with open(os.path.join(solution_dir, SOLUTION_FILE), 'w') as f:
         f.write(template)
 
     open(os.path.join(solution_dir, 'sample.input'), 'w')
 
-    os.system('subl ' + os.path.join(solution_dir, SOLUTION_FILE[language]))
+    # TODO: read or config default editor
+    os.system('subl ' + os.path.join(solution_dir, SOLUTION_FILE))
 
     print "Created solution at " + solution_dir
 
 
-def c_edit():
+def edit():
     global solution_dir
     cwd = os.getcwd()
     if len(arguments) == 1:
         solution_dir = cwd
     else:
         solution_dir = os.path.join(cwd, arguments[1])
-    language = 'C++'
 
     if not check_solution_existence():
         print "Solution not found in " + solution_dir
         exit(2)
 
-    os.system('subl ' + os.path.join(solution_dir, SOLUTION_FILE[language]))
+    os.system('subl ' + os.path.join(solution_dir, SOLUTION_FILE))
 
 
-def c_run():
+def run():
     global solution_dir
     cwd = os.getcwd()
     if len(arguments) == 1:
         solution_dir = cwd
     else:
         solution_dir = os.path.join(cwd, arguments[1])
-    language = 'C++'
 
     if not check_solution_existence():
         print "Solution not found in " + solution_dir
@@ -164,34 +151,38 @@ def c_run():
 
     print "Start compiling..."
 
-    compile_script = COMPILE_SCRIPT[language] % (
-        os.path.join(solution_dir, SOLUTION_FILE[language]),
+    compile_script = COMPILE_SCRIPT % (
+        os.path.join(solution_dir, SOLUTION_FILE),
         os.path.join(os.path.dirname(__file__), 'cpp_header'),
-        os.path.join(solution_dir, OUTPUT_FILE[language])
+        os.path.join(solution_dir, OUTPUT_FILE)
     )
 
     print_script(compile_script)
 
     os.system(compile_script)
-    if os.path.isfile(os.path.join(solution_dir, OUTPUT_FILE[language])):
+    if os.path.isfile(os.path.join(solution_dir, OUTPUT_FILE)):
         print_success("Successfully compiled.")
     else:
         print_error("Failed to compile.")
         exit(1)
 
-    # Run
-    input_files = []
-    for file_name in os.listdir(solution_dir):
-        if len(file_name) > 6 and file_name[-6:] == '.input':
-            input_files.append(file_name)
+    # Check input
+    if len(arguments) == 4 and arguments[2] == '-i':
+        input_files = [arguments[3]]
+    else:
+        input_files = []
+        for file_name in os.listdir(solution_dir):
+            if len(file_name) > 6 and file_name[-6:] == '.input':
+                input_files.append(file_name)
 
+    # Run
     for run_input in input_files:
         message = "Running with input " + run_input
         print "-" * len(message)
         print message
 
-        run_script = RUN_SCRIPT[language] % (
-            os.path.join(solution_dir, OUTPUT_FILE[language]),
+        run_script = RUN_SCRIPT % (
+            os.path.join(solution_dir, OUTPUT_FILE),
             os.path.join(solution_dir, run_input)
         )
         print_script(run_script)
@@ -199,35 +190,42 @@ def c_run():
         os.system(run_script)
 
     # Delete
-    os.remove(os.path.join(solution_dir, OUTPUT_FILE[language]))
+    os.remove(os.path.join(solution_dir, OUTPUT_FILE))
 
 
 COMMANDS = {
-    "init": c_init,
-    "edit": c_edit,
-    "run": c_run
+    "init": init,
+    "edit": edit,
+    "run": run
 }
 
 
 def main():
     global arguments
+    global solution_dir
+
     if len(sys.argv) == 1:
         command = 'run'
         arguments = ['run'] + sys.argv[1:]
     else:
         command = sys.argv[1]
         arguments = sys.argv[1:]
+    determine_solution_dir()
     if command == '-h' or command == '--help':
         print USAGE_MESSAGE
         exit(0)
+
     if command not in COMMANDS.keys():
-        global solution_dir
-        solution_dir = os.path.join(os.getcwd(), command)
-        if check_solution_existence():
+        if command[0] == '-':
+            command = 'run'
+            solution_dir = os.getcwd()
+            arguments = ['run', '.'] + arguments
+        else:
+            solution_dir = os.path.join(os.getcwd(), command)
             command = 'run'
             arguments = ['run'] + arguments
-        else:
-            print "Command \"" + command + "\" not found. Run \"judge -h\" to print the user manual."
+        if not check_solution_existence():
+            print "Command \"" + sys.argv[1] + "\" not found. Run \"judge -h\" to print the user manual."
             exit(1)
     COMMANDS[command]()
 
